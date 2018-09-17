@@ -60,19 +60,21 @@ class Central_GAP:
 
 class SLR_GAP:
     
-    def __init__(self, lambdaa):
-        self.Create_Model()
+    def __init__(self, lambdaa, node_list):
         self.lambdaa = lambdaa
+        self.node_list = node_list
+        self.Create_Model()
+        
    
     def Create_Model(self):
         self.model = ConcreteModel()
-        self.model.nodes   = Set(initialize=range(0,10))
+        self.model.nodes   = Set(initialize = self.node_list)
         self.model.cost    = Param(self.model.nodes*self.model.nodes, initialize=random.randint(0,10))
         self.model.b       = Param(self.model.nodes, initialize=random.randint(0,10))
         self.model.x       = Var(self.model.nodes*self.model.nodes, within=Binary)
   
         def obj_rule(model):
-            first_term  = sum(self.model.x[n]*(self.model.cost[n]+self.model.lambdaa[n]) for n in self.model.nodes*self.model.nodes)          
+            first_term  = sum(self.model.x[n]*(self.model.cost[n]+self.lambdaa[n[0]]) for n in self.model.nodes*self.model.nodes)          
             return first_term
             
         self.model.obj     = Objective(rule=obj_rule,sense=minimize)
@@ -91,6 +93,8 @@ class SLR_GAP:
         results = opt.solve(instance)
         test_flow = 0
             
-        return results    
-a=SLR_GAP()
+        return results 
+lambdaa = [1 for i in range(0,10)] 
+node    = [i for i in range(0,10)  ]
+a=SLR_GAP(lambdaa,node)
 b=a.solve()

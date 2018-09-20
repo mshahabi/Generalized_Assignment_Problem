@@ -6,7 +6,7 @@ Created on Mon Sep 17 13:47:01 2018
 """
 
 """
-Solving a generalized assgnement problem by surrogate lagrangian relaxation
+Solving a small problem with Surrogate LAgrangian Relaxation
 
 """
 
@@ -112,7 +112,7 @@ cost_sp = [[0.5, -1, -5],[0.1, 0.2, 1], [0.5, -1, -5],[0.1, 0.2, 1],[0.5, -1, -5
 alpha = 1
 M = 100
 r = 0.5
-ItrNum = 1
+ItrNum = 2
 ####################SOLVING A RELAXED PROBLEM TO GET q_0######################## 
 #Solving a relaxed problem to get x_0 and 1_0
 gen_relaxed_problem=Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeReals)
@@ -122,16 +122,27 @@ q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)
 Lagrang = sum(obj_cost*x_0 + lambda_[0]*a_1*x_0 + lambda_[1]*a_2*x_0) + 48*lambda_[0] + 250*lambda_[1]
 g_x_0 = sum(a_1*x_0) + 48
 g_x_1 = sum(a_2*x_0) + 250
+g_x_old = np.array([g_x_0**2, g_x_1**2])
 #calculate 
-c_0 = np.array([(q_0-Lagrang)/g_x_0**2, (q_0-Lagrang)/g_x_1**2 ])
+c_k = np.array([(q_0-Lagrang)/g_x_0**2, (q_0-Lagrang)/g_x_1**2 ])
 
-lambda_ = lambda_ + c_0*np.array([g_x_0, g_x_1])
+lambda_ = lambda_ + c_k*g_x_old
 lambda_[lambda_<0] = 0
 sub_sol = np.array([])
-for k in range(0, ItrNum):
+for k in range(1, ItrNum):
     for sub in range(0,6):
           sp = Sub_Problem(lambda_, cost_sp[sub])
           x_sp=sp.solve(solver_name, True)
           sub_sol = np.append(sub_sol, [x_sp])
           
     Lagrang = sum(obj_cost*sub_sol + lambda_[0]*a_1*sub_sol + lambda_[1]*a_2*sub_sol) + 48*lambda_[0] + 250*lambda_[1]
+    g_x_0 = sum(a_1*sub_sol) + 48
+    g_x_1 = sum(a_2*sub_sol) + 250
+    g_x_new = [g_x_0**2 , g_x_1**2]
+    p = float(1 - 1/(k**r))
+    alpha = 1- float(1/(M*k**float(p)))
+    c_k = alpha*c_k*(g_x_new/g_x_old)
+    lambda_ = lambda_ + c_k*g_x_new
+    lambda_[lambda_<0] = 0
+    g_x_old = g_x_new
+    

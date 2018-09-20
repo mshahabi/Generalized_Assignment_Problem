@@ -95,13 +95,17 @@ class Sub_Problem:
             logging.warning('Check solver optimality?')
         instance.solutions.store_to(results)
         return value(instance.x[0] )
-    
+
+##################EXACT RESULTS################################################
+
+gen_relaxed_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeReals)
+display_solver_log = True
+q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)    
 ################### SET THE SOLVER#############################################
-solver_name =  "BONMIN"
-#Number of VAriables 
+solver_name =  "BONMIN"#Number of VAriables 
 number_of_variables = 6
 #Initializing Lambda
-lambda_ = np.array([1 , 1])
+lambda_ = np.array([1.1 , 1.1])
 #Initial Problem cost
 a_1 = np.array([-1,0.2,-1,0.2,-1,0.2])
 a_2 = np.array([-5,1,-5,1,-5,1])
@@ -110,38 +114,42 @@ obj_cost = np.array([0.5, 0.1, 0.5, 0.1, 0.5, 0.1])
 cost_sp = [[0.5, -1, -5],[0.1, 0.2, 1], [0.5, -1, -5],[0.1, 0.2, 1],[0.5, -1, -5], [0.1, 0.2, 1]]   
 #SLR initial paramters
 alpha = 1
-M = 100
-r = 0.5
-ItrNum = 2
+M = 10
+r = 0.1
+ItrNum = 32
+##################EXACT RESULTS################################################
+gen_relaxed_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeIntegers)
+display_solver_log = True
+q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)  
 ####################SOLVING A RELAXED PROBLEM TO GET q_0######################## 
 #Solving a relaxed problem to get x_0 and 1_0
-gen_relaxed_problem=Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeReals)
+gen_relaxed_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeReals)
 display_solver_log = True
 q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)
 # Evaluating the x_0 solution in lagrangian function
-Lagrang = sum(obj_cost*x_0 + lambda_[0]*a_1*x_0 + lambda_[1]*a_2*x_0) + 48*lambda_[0] + 250*lambda_[1]
+Lagrang = sum(obj_cost*x_0**2 + lambda_[0]*a_1*x_0 + lambda_[1]*a_2*x_0) + 48*lambda_[0] + 250*lambda_[1]
 g_x_0 = sum(a_1*x_0) + 48
 g_x_1 = sum(a_2*x_0) + 250
 g_x_old = np.array([g_x_0**2, g_x_1**2])
 #calculate 
-c_k = np.array([(q_0-Lagrang)/g_x_0**2, (q_0-Lagrang)/g_x_1**2 ])
+c_k = np.array([(q_0-Lagrang)/sum(g_x_old), (q_0-Lagrang)/sum(g_x_old) ])
 
 lambda_ = lambda_ + c_k*g_x_old
 lambda_[lambda_<0] = 0
-sub_sol = np.array([])
+
 for k in range(1, ItrNum):
+    sub_sol = np.array([])
     for sub in range(0,6):
           sp = Sub_Problem(lambda_, cost_sp[sub])
           x_sp=sp.solve(solver_name, True)
           sub_sol = np.append(sub_sol, [x_sp])
           
-    Lagrang = sum(obj_cost*sub_sol + lambda_[0]*a_1*sub_sol + lambda_[1]*a_2*sub_sol) + 48*lambda_[0] + 250*lambda_[1]
     g_x_0 = sum(a_1*sub_sol) + 48
     g_x_1 = sum(a_2*sub_sol) + 250
-    g_x_new = [g_x_0**2 , g_x_1**2]
-    p = float(1 - 1/(k**r))
-    alpha = 1- float(1/(M*k**float(p)))
-    c_k = alpha*c_k*(g_x_new/g_x_old)
+    g_x_new = np.array([g_x_0**2 , g_x_1**2])
+    p = 1 - 1/(k**r)
+    alpha = 1- 1/(M*k**p)
+    c_k = alpha*c_k*sum(g_x_old)/sum(g_x_new)
     lambda_ = lambda_ + c_k*g_x_new
     lambda_[lambda_<0] = 0
     g_x_old = g_x_new

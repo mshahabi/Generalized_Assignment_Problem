@@ -6,7 +6,7 @@ Created on Mon Sep 17 13:47:01 2018
 """
 
 """
-Solving a small problem with Surrogate LAgrangian Relaxation
+Solving a small problem with Surrogate Lagrangian Relaxation
 
 """
 
@@ -19,17 +19,18 @@ from scipy import sparse
 import math
 import logging
 import numpy as np
+import cplex
+import matplotlib.pyplot as plt
 
-class Central_Test:
-    
+
+class Central_Test:    
     def __init__(self, number_of_x, a1, a2, obj_cost, variable_type):
         self.a1 = a1
         self.a2 = a2
         self.cost = obj_cost
         self.number_of_x = number_of_x
         self.Create_Model(variable_type)
-       
-   
+          
     def Create_Model(self, variable_type):
         self.model = ConcreteModel()
         self.model.nodes   = Set(initialize=range(0, self.number_of_x))
@@ -46,7 +47,6 @@ class Central_Test:
         def flow_balance_2(model):          
             return sum(self.model.x[n]*self.a2[n] for n in self.model.nodes)<=-250 
         
-                
         self.model.flowbal_1 = Constraint(rule=flow_balance_1)
         self.model.flowbal_2 = Constraint(rule=flow_balance_2)
         self.model.pprint    
@@ -65,10 +65,7 @@ class Central_Test:
                     x_v.append(instance.x[p].value)
         return value(instance.obj), np.array(x_v)
 
-
-
-class Sub_Problem:
-    
+class Sub_Problem:    
     def __init__(self, lambdaa, cost):
         self.lambdaa = lambdaa
         self.cost = cost
@@ -84,9 +81,10 @@ class Sub_Problem:
             return first_term 
         
         self.model.obj     = Objective(rule=obj_rule,sense=minimize)
-     
+             
     def solve(self, solver_name, display_solution_stream=False):
         instance = self.model
+        instance.pprint
         opt = SolverFactory(solver_name)
         results = opt.solve(instance, tee=display_solution_stream)
         if (results.solver.status != pyomo.opt.SolverStatus.ok):
@@ -95,62 +93,94 @@ class Sub_Problem:
             logging.warning('Check solver optimality?')
         instance.solutions.store_to(results)
         return value(instance.x[0] )
+    
 
-##################EXACT RESULTS################################################
-
-gen_relaxed_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeReals)
-display_solver_log = True
-q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)    
+      
 ################### SET THE SOLVER#############################################
 solver_name =  "BONMIN"#Number of VAriables 
 number_of_variables = 6
-#Initializing Lambda
-lambda_ = np.array([1.1 , 1.1])
+ #Initializing Lambda0
+lambda_acum = {"x": [], "y": []}
+lambda_ = np.array([1.01357254,  2.1719696])
+lambda_acum["x"].append(lambda_[0])
+lambda_acum["y"].append(lambda_[1])
 #Initial Problem cost
 a_1 = np.array([-1,0.2,-1,0.2,-1,0.2])
 a_2 = np.array([-5,1,-5,1,-5,1])
 obj_cost = np.array([0.5, 0.1, 0.5, 0.1, 0.5, 0.1])
 #Sub problem costs
-cost_sp = [[0.5, -1, -5],[0.1, 0.2, 1], [0.5, -1, -5],[0.1, 0.2, 1],[0.5, -1, -5], [0.1, 0.2, 1]]   
+cost_sp = [[0.5, -1, -5], [0.1, 0.2, 1], [0.5, -1, -5], [0.1, 0.2, 1], [0.5, -1, -5], [0.1, 0.2, 1]]   
 #SLR initial paramters
-alpha = 1
-M = 10
-r = 0.1
-ItrNum = 32
-##################EXACT RESULTS################################################
+alpha = 0.8
+M = 100
+r = 0.5
+ItrNum = 80
+#################2#EXACT RESULTS################################################
+
 gen_relaxed_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeIntegers)
-display_solver_log = True
+display_solver_log = False
 q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)  
 ####################SOLVING A RELAXED PROBLEM TO GET q_0######################## 
+solver_name =  "BONMIN"
 #Solving a relaxed problem to get x_0 and 1_0
 gen_relaxed_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeReals)
-display_solver_log = True
+display_solver_log = False
 q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)
 # Evaluating the x_0 solution in lagrangian function
 Lagrang = sum(obj_cost*x_0**2 + lambda_[0]*a_1*x_0 + lambda_[1]*a_2*x_0) + 48*lambda_[0] + 250*lambda_[1]
 g_x_0 = sum(a_1*x_0) + 48
 g_x_1 = sum(a_2*x_0) + 250
-g_x_old = np.array([g_x_0**2, g_x_1**2])
+g_x_old = np.array([g_x_0, g_x_1])
 #calculate 
-c_k = np.array([(q_0-Lagrang)/sum(g_x_old), (q_0-Lagrang)/sum(g_x_old) ])
+c_k_old = (q_0-Lagrang)/sum(g_x_old**2)
 
-lambda_ = lambda_ + c_k*g_x_old
+lambda_ = lambda_ + c_k_old*g_x_old
 lambda_[lambda_<0] = 0
-
+even_flag = 0
+sub_sol = np.array([0.00,0.00,0.00,0.00,0.00,0.00],dtype=float)
 for k in range(1, ItrNum):
-    sub_sol = np.array([])
-    for sub in range(0,6):
-          sp = Sub_Problem(lambda_, cost_sp[sub])
-          x_sp=sp.solve(solver_name, True)
-          sub_sol = np.append(sub_sol, [x_sp])
-          
+    if k%2 ==0: 
+        even_flag = 1 
+    else:even_flag = 0
+    lambda_acum["x"].append(lambda_[0])
+    lambda_acum["y"].append(lambda_[1]) 
+    for sub in range(0,6):        
+          if (even_flag == 1 and sub%2 ==1):
+#              x_sp = test_solution(lambda_,cost_sp[sub])
+              sp = Sub_Problem(lambda_, cost_sp[sub])
+              x_sp=sp.solve(solver_name, False)
+              sub_sol[sub] = x_sp
+          elif(even_flag == 0 and sub%2 ==0):
+#              x_sp = test_solution(lambda_,cost_sp[sub])
+              sp = Sub_Problem(lambda_, cost_sp[sub])
+              x_sp=sp.solve(solver_name, False)
+              sub_sol[sub] = x_sp
     g_x_0 = sum(a_1*sub_sol) + 48
     g_x_1 = sum(a_2*sub_sol) + 250
-    g_x_new = np.array([g_x_0**2 , g_x_1**2])
+    g_x_new = np.array([g_x_0 , g_x_1])
+    if g_x_0 <0 and g_x_1<0: break
     p = 1 - 1/(k**r)
     alpha = 1- 1/(M*k**p)
-    c_k = alpha*c_k*sum(g_x_old)/sum(g_x_new)
+    c_k = alpha*c_k_old*(sum(g_x_old**2)/sum(g_x_new**2))
     lambda_ = lambda_ + c_k*g_x_new
     lambda_[lambda_<0] = 0
     g_x_old = g_x_new
+    c_k_old = c_k
+    obj_value = sum(obj_cost*sub_sol**2) 
     
+# test functin to test the value of the optimitionproblem
+def test_solution(lambdaa,cost_):
+    b = lambdaa[0]*cost_[1] + lambdaa[1]*cost_[2]
+    x_1 =  -  b/(2*cost_[0])
+    if x_1<0:x_1=0 
+    return int(x_1)   
+
+
+def plot_fun(lambda_):
+      fig = plt.figure()
+      ax = fig.add_subplot(111)
+      ax.scatter(lambda_["x"], lambda_["y"])
+      ax.set_xlabel('Lambda 1')
+      ax.set_ylabel('Lambda 0')
+      plt.show()    
+plot_fun(lambda_acum)      

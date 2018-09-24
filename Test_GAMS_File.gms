@@ -5,7 +5,7 @@ Equations        objfun  defines the objective function
                  maxengavl enforces the maximum availability of engineers
                  maxlaidoff enforces the maximum number of laid off engineers
 ;
-
+             x1.fx = 18;x3.fx = 18; x5.fx = 18; 
 objfun..     z =e= 0.5*power(x1,2)+0.1*power(x2,2)+0.5*power(x3,2)+0.1*power(x4,2)+0.5*power(x5,2)+0.1*power(x6,2);
 maxengavl..  48 -x1 +0.2*x2 -x3 +0.2*x4 -x5 +0.2*x6 =l= 0;
 maxlaidoff.. 250 -5*x1 +x2 -5*x3 +x4 -5*x5 +x6 =l= 0 ;

@@ -101,7 +101,7 @@ solver_name =  "BONMIN"#Number of VAriables
 number_of_variables = 6
  #Initializing Lambda0
 lambda_acum = {"x": [], "y": []}
-lambda_ = np.array([0.1357254,  0.1719696])
+lambda_ = np.array([0.1357254,  1.1719696])
 lambda_acum["x"].append(lambda_[0])
 lambda_acum["y"].append(lambda_[1])
 #Initial Problem cost
@@ -114,21 +114,27 @@ cost_sp = [[0.5, -1, -5], [0.1, 0.2, 1], [0.5, -1, -5], [0.1, 0.2, 1], [0.5, -1,
 alpha = 0.5
 M = 100
 r = 0.5
-ItrNum = 10
-#################2#EXACT RESULTS################################################
-gen_relaxed_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeIntegers)
+ItrNum = 50
+##################EXACT RESULTS################################################
+gen_exact_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeIntegers)
 display_solver_log = False
-q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)  
-####################SOLVING A RELAXED PROBLEM TO GET q_0######################## 
-solver_name =  "BONMIN"
+q_e, x_e = gen_exact_problem.solve(solver_name, display_solver_log)  
+####################SOLVING CONTNIOUS RELAXATION PROBLEM TO GET q_0######################## 
 #Solving a relaxed problem to get x_0 and 1_0
 gen_relaxed_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeReals)
 display_solver_log = False
-q_0, x_0 = gen_relaxed_problem.solve(solver_name, display_solver_log)
+q_0, x_r = gen_relaxed_problem.solve(solver_name, display_solver_log)  
+####################SOLVING THE Lagrangian RELAXATION PROBLEM TO GET Lagrangian Value######################## 
+sub_sol = np.empty([6],dtype=float)
+for sub in range(0,6):        
+     sp = Sub_Problem(lambda_, cost_sp[sub])
+     x_l=sp.solve(solver_name, False)
+     sub_sol[sub] = x_l
 # Evaluating the x_0 solution in lagrangian function
-Lagrang = sum((obj_cost*x_0**2 + lambda_[0]*a_1*x_0 + lambda_[1]*a_2*x_0)) + 48*lambda_[0] + 250*lambda_[1]
-g_x_0 = sum((a_1*x_0)) + 48
-g_x_1 = sum((a_2*x_0)) + 250
+Lagrang = sum(obj_cost*sub_sol[i]**2 + lambda_[0]*a_1*sub_sol[i] + lambda_[1]*a_2*sub_sol[i] for i in range(0,6)) 
+Lagrang = sum(Lagrang) + 48*lambda_[0] + 250*lambda_[1] 
+g_x_0 = sum((a_1*sub_sol)) + 48
+g_x_1 = sum((a_2*sub_sol)) + 250
 g_x_old = np.array([g_x_0, g_x_1])
 #calculate 
 c_k_old = (q_0-Lagrang)/sum((g_x_old**2))
@@ -136,7 +142,6 @@ c_k_old = (q_0-Lagrang)/sum((g_x_old**2))
 lambda_ = lambda_ + c_k_old*g_x_old
 lambda_[lambda_<0] = 0
 even_flag = 0
-sub_sol = np.array([0.00,0.00,0.00,0.00,0.00,0.00],dtype=float)
 for k in range(1, ItrNum):
     if k%2 ==0: 
         even_flag = 1 
@@ -166,7 +171,7 @@ for k in range(1, ItrNum):
     c_k_old = c_k
     obj_value = (obj_cost*sub_sol**2)
     obj_value = sum(obj_value)
-    if g_x_0 <=0 or g_x_1<=0: break
+#    if g_x_0 <=0 or g_x_1<=0: break
     
 # test functin to test the value of the optimitionproblem
 def test_solution(lambdaa,cost_):

@@ -137,7 +137,7 @@ lambdaa = [-100 for i in range(0,num_of_jobs)]
 lambda_acum["x"].append(lambdaa[0])
 lambda_acum["y"].append(lambdaa[1])
 #SLR initial paramters
-alpha = 0.5
+alpha = 0.6
 M = 100
 r = 0.5
 ItrNum = 30

@@ -23,21 +23,12 @@ import cplex
 
 class Central_GAP:
     
-    def __init__(self,nbM,nbJ):
+    def __init__(self,nbM,nbJ,cost,capacity):
         self.nbM = nbM
         self.nbJ = nbJ
-        self.cost, self.b = self.gen_rand_problem()
+        self.cost, self.b = cost, capacity
         self.Create_Model()
-    
-    def gen_rand_problem(self):
-        cost_ = np.empty([self.nbM,self.nbJ], dtype=float)
-        cap = np.empty([self.nbM], dtype=float)
-        for M in range(0, self.nbM):
-            cap[M] = random.randint(100,300)
-            for J in range(0, self.nbJ):
-                cost_[M,J] = random.randint(0,100)       
-        return cost_, cap
-        
+           
     def Create_Model(self):
         self.model = ConcreteModel()
         self.model.nbM   = Set(initialize=range(0,self.nbM))
@@ -64,72 +55,128 @@ class Central_GAP:
     def solve(self, display_solution_stream=False , solve_relaxation = False):
         instance = self.model
         instance.preprocess()
-        opt = SolverFactory("Cplex" )
-        opt.relax=1
+        opt = SolverFactory("cplex")
+        opt.relax = solve_relaxation
         results = opt.solve(instance, tee=display_solution_stream)
         if (results.solver.status != pyomo.opt.SolverStatus.ok):
             logging.warning('Check solver not ok?')
         if (results.solver.termination_condition != pyomo.opt.TerminationCondition.optimal):  
             logging.warning('Check solver optimality?')
         instance.solutions.store_to(results)
+        x_v = np.empty([self.nbM,self.nbJ], dtype=int) 
         for p in instance.nbM:
             for q in instance.nbJ:
-                if instance.x[p,q].value==1:
-                    print(p,q,instance.x[p,q].value)
-        return instance 
-            
-        return results
+                    x_v[p,q] = instance.x[p,q].value
+        return value(instance.obj), x_v 
 
-
-class SLR_GAP:
+class SLR_SubProblem():
     
-    def __init__(self, lambdaa, node_list):
-        self.lambdaa = lambdaa
-        self.node_list = node_list
-        self.Create_Model()
+    def __init__(self, lambdaa, nbM, nbJ, cost, capacity):
+        self.cost, self.b = cost, capacity
+        self.nbM = nbM
+        self.nbJ= nbJ
+        self.Create_Sub_Problem(lambdaa)
           
-    def Create_Model(self):
-        self.model = ConcreteModel()
-        self.model.nodes   = Set(initialize = self.node_list)
-        self.model.cost    = Param(self.model.nodes*self.model.nodes, initialize=random.randint(5,10))
-        self.model.b       = Param(self.model.nodes, initialize=random.randint(0,10))
-        self.model.x       = Var(self.model.nodes*self.model.nodes, within=Binary)
+    def Create_Sub_Problem(self, lambdaa):
+        self.model         = ConcreteModel()
+        self.lambdaa       = lambdaa
+        self.model.nbM     = Set(initialize=range(0,self.nbM))
+        self.model.nbJ     = Set(initialize=range(0,self.nbJ))
+        self.model.cost    = self.cost
+        self.model.b       = self.b
+        self.model.x       = Var(self.model.nbM*self.model.nbJ, within=Binary)
   
         def obj_rule(model):
-            first_term  = sum(self.model.x[n]*(self.model.cost[n]+self.lambdaa[n[0]]) for n in self.model.nodes*self.model.nodes)
-            second_term = sum(self.lambdaa[n[0]] for n in self.model.nodes*self.model.nodes) 
+            first_term  = sum(self.model.x[n]*(self.model.cost[n]+self.lambdaa[n[0]]) for n in self.model.nbM*self.model.nbJ)
+            second_term = sum(self.lambdaa[n[0]] for n in self.model.nbM*self.model.nbJ) 
             return first_term - second_term
             
         self.model.obj     = Objective(rule=obj_rule,sense=minimize)
             
-        def flow_balance_1(model,p):
-            return sum(self.model.x[n,p] for n in self.model.nodes)<= self.model.b[p] 
+        def flow_balance_1(model,m):
+            return sum(self.model.x[m,j] for j in self.model.nbJ)<= self.model.b[m] 
                        
-        self.model.flowbal_1 = Constraint(self.model.nodes, rule=flow_balance_1)
-        self.model.flowbal_2 = Constraint(self.model.nodes, rule=flow_balance_1)
-            
+        self.model.flowbal_1 = Constraint(self.model.nbM, rule=flow_balance_1)            
         
     def solve(self, display_solution_stream=False , solve_relaxation = True):
         instance = self.model
         instance.preprocess()
         instance.display()
-        opt = SolverFactory("GLPK" )
-        opt.relax = True
+        opt = SolverFactory("cplex" )
+        opt.relax = solve_relaxation
         results = opt.solve(instance, tee=display_solution_stream)
         if (results.solver.status != pyomo.opt.SolverStatus.ok):
             logging.warning('Check solver not ok?')
         if (results.solver.termination_condition != pyomo.opt.TerminationCondition.optimal):  
             logging.warning('Check solver optimality?')
         instance.solutions.store_to(results)
-        for p in instance.nodes:
-            for q in instance.nodes:
-                if instance.x[p,q].value != 0:
-                    print(p,q,instance.x[p,q].value)
-        return instance 
+        x_s = np.empty([self.nbM,self.nbJ], dtype=int) 
+        for p in instance.nbM:
+            for q in instance.nbJ:
+                    x_s[p,q] = instance.x[p,q].value
+        return x_s 
     
-    
-lambdaa = [-10 for i in range(0,10)] 
-node    = [i for i in range(0,10)]
-a=Central_GAP(5,6)
-#a=SLR_GAP(lambdaa, node)
-b=a.solve(True, True)
+#########################Function to generate a random problem#################
+def gen_rand_problem(nbM,nbJ):
+     cost_ = np.empty([nbM,nbJ], dtype=float)
+     cap = np.empty([nbM], dtype=float)
+     for M in range(0, nbM):
+         cap[M] = random.randint(0,8)
+         for J in range(0, nbJ):
+             cost_[M,J] = random.randint(0,100)       
+     return cost_, cap    
+################### SET THE SOLVER#############################################
+solver_name =  "cplex"
+num_of_machines = 10
+num_of_jobs = 12
+relaxed_nbM = int(num_of_machines/2)
+cost,cap = gen_rand_problem(num_of_machines,num_of_jobs)
+ #Initializing Lambda0
+lambda_acum = {"x": [], "y": []}
+lambdaa = [-100 for i in range(0,num_of_jobs)] 
+lambda_acum["x"].append(lambdaa[0])
+lambda_acum["y"].append(lambdaa[1])
+#SLR initial paramters
+alpha = 0.5
+M = 100
+r = 0.5
+ItrNum = 30
+#################2#EXACT RESULTS###############################################
+gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
+display_solver_log = True
+relax_solution = False
+q_e, x_e = gen_exact_problem.solve(display_solver_log,relax_solution)  
+####################SOLVING A RELAXED PROBLEM TO GET q_0#######################
+gen_exact_problem = Central_GAP(relaxed_nbM, num_of_jobs, cost, cap)
+display_solver_log = True
+relax_solution = False
+q_0, x_0 = gen_exact_problem.solve(display_solver_log,relax_solution)  
+# Evaluating the x_0 solution in lagrangian function
+Lagrang = sum(x_0[m,j]*(cost[m,j]+lambdaa[j]) for m in range(0,relaxed_nbM) for j in range(0,num_of_jobs)) - sum(lambdaa[j] for j in range(0,num_of_jobs))
+g_m = np.empty([num_of_jobs], dtype=int)
+for j in range(0,num_of_jobs):
+    g_m[j] =  x_0[:,j].sum()-1
+g_m_old = sum(g_m**2)    
+if g_m_old ==0:
+    g_m_old = 0.001
+c_k_old = (q_0-Lagrang)/g_m_old
+lambdaa = lambdaa + c_k_old*g_m
+sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int) 
+for k in range(1, ItrNum):
+    sp = SLR_SubProblem(lambdaa, num_of_machines, num_of_jobs, cost, cap)
+    x_sp = sp.solve(solver_name, False)
+
+    for j in range(0,num_of_jobs):
+        g_m[j] =  x_sp.sum()-1
+    g_m_new = sum(g_m**2)    
+    if g_m_new ==0:
+        g_m_new = 0.001
+    p = 1 - 1/(k**r)
+    alpha = 1- 1/(M*k**p)
+    c_k = alpha*c_k_old*g_m_old/g_m_new
+    lambdaa = lambdaa + c_k*g_m_new
+    g_m_old = g_m_new
+    c_k_old = c_k
+    obj = sum(x_sp[m,j]*cost[m,j] for m in range(0,num_of_machines) for j in range(0,num_of_jobs))
+
+       

@@ -101,7 +101,7 @@ solver_name =  "BONMIN"#Number of VAriables
 number_of_variables = 6
  #Initializing Lambda0
 lambda_acum = {"x": [], "y": []}
-lambda_ = np.array([0.1357254,  1.1719696])
+lambda_ = np.array([0.1357254,  1.1019696])
 lambda_acum["x"].append(lambda_[0])
 lambda_acum["y"].append(lambda_[1])
 #Initial Problem cost
@@ -111,10 +111,10 @@ obj_cost = np.array([0.5, 0.1, 0.5, 0.1, 0.5, 0.1])
 #Sub problem costs
 cost_sp = [[0.5, -1, -5], [0.1, 0.2, 1], [0.5, -1, -5], [0.1, 0.2, 1], [0.5, -1, -5], [0.1, 0.2, 1]]   
 #SLR initial paramters
-alpha = 0.5
-M = 100
-r = 0.5
-ItrNum = 50
+alpha = 0.9
+M = 50
+r = 0.8
+ItrNum = 25
 ##################EXACT RESULTS################################################
 gen_exact_problem = Central_Test(number_of_variables, a_1, a_2, obj_cost, NonNegativeIntegers)
 display_solver_log = False
@@ -126,13 +126,14 @@ display_solver_log = False
 q_0, x_r = gen_relaxed_problem.solve(solver_name, display_solver_log)  
 ####################SOLVING THE Lagrangian RELAXATION PROBLEM TO GET Lagrangian Value######################## 
 sub_sol = np.empty([6],dtype=float)
+Lagrang = 0
 for sub in range(0,6):        
      sp = Sub_Problem(lambda_, cost_sp[sub])
      x_l=sp.solve(solver_name, False)
+     Lagrang = obj_cost[sub]*x_l**2 + lambda_[0]*a_1[sub]*x_l + lambda_[1]*a_2[sub]*x_l + Lagrang
      sub_sol[sub] = x_l
 # Evaluating the x_0 solution in lagrangian function
-Lagrang = sum(obj_cost*sub_sol[i]**2 + lambda_[0]*a_1*sub_sol[i] + lambda_[1]*a_2*sub_sol[i] for i in range(0,6)) 
-Lagrang = sum(Lagrang) + 48*lambda_[0] + 250*lambda_[1] 
+Lagrang = Lagrang + 48*lambda_[0] + 250*lambda_[1] 
 g_x_0 = sum((a_1*sub_sol)) + 48
 g_x_1 = sum((a_2*sub_sol)) + 250
 g_x_old = np.array([g_x_0, g_x_1])
@@ -159,19 +160,20 @@ for k in range(1, ItrNum):
               sp = Sub_Problem(lambda_, cost_sp[sub])
               x_sp=sp.solve(solver_name, False)
               sub_sol[sub] = x_sp
+    print(sub_sol)          
     g_x_0 = sum((a_1*sub_sol)) + 48
     g_x_1 = sum((a_2*sub_sol)) + 250
     g_x_new = np.array([g_x_0 , g_x_1])
     p = 1 - 1/(k**r)
     alpha = 1- 1/(M*k**p)
     c_k = alpha*c_k_old*(sum((g_x_old**2))/sum((g_x_new**2)))
+    obj_value = (obj_cost*sub_sol**2)
+    obj_value = sum(obj_value)
+    if (c_k*g_x_new.all()) <= 0.0000000000001 : break
     lambda_ = lambda_ + c_k*g_x_new
     lambda_[lambda_<0] = 0
     g_x_old = g_x_new
     c_k_old = c_k
-    obj_value = (obj_cost*sub_sol**2)
-    obj_value = sum(obj_value)
-#    if g_x_0 <=0 or g_x_1<=0: break
     
 # test functin to test the value of the optimitionproblem
 def test_solution(lambdaa,cost_):
@@ -184,7 +186,7 @@ def test_solution(lambdaa,cost_):
 def plot_fun(lambda_):
       fig = plt.figure()
       ax = fig.add_subplot(111)
-      ax.plot(lambda_["y"], lambda_["x"],'-o')
+      ax.plot(lambda_["x"], lambda_["y"],'-o')
       ax.set_xlabel('Lambda 1')
       ax.set_ylabel('Lambda 0')
       plt.show()    

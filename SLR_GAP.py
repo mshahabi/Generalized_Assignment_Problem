@@ -140,7 +140,7 @@ lambda_acum["y"].append(lambdaa[1])
 alpha = 0.6
 M = 100
 r = 0.5
-ItrNum = 10
+ItrNum = 80
 #################2#EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False

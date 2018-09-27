@@ -125,22 +125,24 @@ def gen_rand_problem(nbM,nbJ):
              cost_[M,J] = random.randint(0,100)       
      return cost_, cap    
 ################### SET THE SOLVER#############################################
-solver_name =  "cplex"
-num_of_machines = 10
-num_of_jobs = 12
-relaxed_nbM = num_of_machines
-cost,cap = gen_rand_problem(num_of_machines,num_of_jobs)
-relaxed_cap = cap*3
- #Initializing Lambda0
-lambda_acum = {"x": [], "y": []}
-lambdaa = [-10 for i in range(0,num_of_jobs)] 
-lambda_acum["x"].append(lambdaa[0])
-lambda_acum["y"].append(lambdaa[1])
-#SLR initial paramters
-alpha = 0.6
-M = 100
-r = 0.5
-ItrNum = 80
+class Generate_Data:
+    def __init__(self, solver_name, num_of_machines, num_of_jobs):
+        self.num_of_machines = 10
+        self.num_of_jobs = 12
+        self.relaxed_nbM = num_of_machines
+        self.cost, self.cap = gen_rand_problem(num_of_machines,num_of_jobs)
+        self.relaxed_cap = cap*3
+    #Initializing Lambda0
+        lambda_acum = {"x": [], "y": []}
+        lambdaa = [-10 for i in range(0,num_of_jobs)]
+        self.lambdaa = lambdaa
+        lambda_acum["x"].append(lambdaa[0])
+        lambda_acum["y"].append(lambdaa[1])
+    #SLR initial paramters
+        self.alpha = 0.6
+        self.M = 100
+        self.r = 0.5
+        self.ItrNum = 80
 #################2#EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False

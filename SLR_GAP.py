@@ -21,8 +21,7 @@ import logging
 import numpy as np
 import cplex
 
-class Central_GAP:
-    
+class Central_GAP:    
     def __init__(self,nbM,nbJ,cost,capacity):
         self.nbM = nbM
         self.nbJ = nbJ
@@ -69,8 +68,7 @@ class Central_GAP:
                     x_v[p,q] = instance.x[p,q].value
         return value(instance.obj), x_v 
 
-class SLR_SubProblem():
-    
+class SLR_SubProblem():    
     def __init__(self, lambdaa, nbM, nbJ, cost, capacity):
         self.cost, self.b = cost, capacity
         self.nbM = nbM
@@ -123,15 +121,21 @@ def gen_rand_problem(nbM,nbJ):
          cap[M] = 2
          for J in range(0, nbJ):
              cost_[M,J] = random.randint(0,100)       
-     return cost_, cap    
-################### SET THE SOLVER#############################################
+     return cost_, cap 
+   
+
 class Generate_Data:
+    """ 
+        The class CalendarClock implements a clock with integrated 
+        calendar. It's a case of multiple inheritance, as it inherits 
+        both from Clock and Calendar      
+    """
     def __init__(self, solver_name, num_of_machines, num_of_jobs):
         self.num_of_machines = 10
         self.num_of_jobs = 12
         self.relaxed_nbM = num_of_machines
         self.cost, self.cap = gen_rand_problem(num_of_machines,num_of_jobs)
-        self.relaxed_cap = cap*3
+        self.relaxed_cap = self.cap*3
     #Initializing Lambda0
         lambda_acum = {"x": [], "y": []}
         lambdaa = [-10 for i in range(0,num_of_jobs)]
@@ -144,10 +148,19 @@ class Generate_Data:
         self.r = 0.5
         self.ItrNum = 80
 #################2#EXACT RESULTS###############################################
-gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
-display_solver_log = False
-relax_solution = False
-q_e, x_e = gen_exact_problem.solve(display_solver_log,relax_solution)  
+class Solve_Exact(Generate_Data, Central_GAP):   
+    """ 
+        The class CalendarClock implements a clock with integrated 
+        calendar. It's a case of multiple inheritance, as it inherits 
+        both from Clock and Calendar      
+    """
+    def __init__(self, solver_name, num_of_machines, num_of_jobs):
+        Generate_Data.__init__(self,solver_name, num_of_machines, num_of_jobs)
+        Central_GAP.__init__(self, num_of_machines, num_of_jobs, self.cost, self.cap )
+        gen_exact_problem = Central_GAP()
+        display_solver_log = False
+        relax_solution = False
+        q_e, x_e = gen_exact_problem.solve(display_solver_log,relax_solution)  
 ####################SOLVING A RELAXED PROBLEM TO GET q_0#######################
 gen_relax_problem = Central_GAP(relaxed_nbM, num_of_jobs, cost, relaxed_cap)
 display_solver_log = False

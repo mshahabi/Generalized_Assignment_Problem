@@ -68,7 +68,7 @@ class Central_GAP:
                     x_v[p,q] = instance.x[p,q].value
         return value(instance.obj), x_v 
 
-class SLR_SubProblem():    
+class SLR_SubProblem:    
     def __init__(self, lambdaa, nbM, nbJ, cost, capacity):
         self.cost, self.b = cost, capacity
         self.nbM = nbM
@@ -96,7 +96,7 @@ class SLR_SubProblem():
                        
         self.model.flowbal_1 = Constraint(self.model.nbM, rule=flow_balance_1)            
         
-    def solve_sp(self, display_solution_stream=False , solve_relaxation = False):
+    def solve(self, display_solution_stream=False , solve_relaxation = False):
         instance = self.model
         instance.preprocess()
         opt = SolverFactory("cplex" )
@@ -137,32 +137,41 @@ class Generate_Data:
         self.cost, self.cap = gen_rand_problem(num_of_machines,num_of_jobs)
         self.relaxed_cap = self.cap*3
     #Initializing Lambda0
-        lambda_acum = {"x": [], "y": []}
-        lambdaa = [-10 for i in range(0,num_of_jobs)]
-        self.lambdaa = lambdaa
-        lambda_acum["x"].append(lambdaa[0])
-        lambda_acum["y"].append(lambdaa[1])
+        lambda_acum = {"x": [], "y": []} 
+        self.lambdaa = [-10 for i in range(0, self.num_of_jobs)]
+        lambda_acum["x"].append(self.lambdaa[0])
+        lambda_acum["y"].append(self.lambdaa[1])
     #SLR initial paramters
         self.alpha = 0.6
         self.M = 100
         self.r = 0.5
         self.ItrNum = 80
-#################2#EXACT RESULTS###############################################
-class Solve_Exact(Generate_Data, Central_GAP):   
+        
+class SLR_Initial(Generate_Data, Central_GAP):   
     """ 
         The class CalendarClock implements a clock with integrated 
         calendar. It's a case of multiple inheritance, as it inherits 
         both from Clock and Calendar      
     """
     def __init__(self, solver_name, num_of_machines, num_of_jobs):
-        Generate_Data.__init__(self,solver_name, num_of_machines, num_of_jobs)
-        Central_GAP.__init__(self, num_of_machines, num_of_jobs, self.cost, self.cap )
-        gen_exact_problem = Central_GAP()
         display_solver_log = False
         relax_solution = False
-        q_e, x_e = gen_exact_problem.solve(display_solver_log,relax_solution)  
+        Generate_Data.__init__(self,solver_name, num_of_machines, num_of_jobs)
+        Central_GAP.__init__(self, num_of_machines, num_of_jobs, self.cost, self.cap )
+        gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, self.cost, self.cap)
+        """Solve the exact problem"""
+        self.q_e, self.x_e = gen_exact_problem.solve(display_solver_log,relax_solution)
+        """Solve the relaxed problem"""
+        gen_relax_problem = Central_GAP(num_of_machines, num_of_jobs, self.cost, self.relaxed_cap)
+        self.q_0, self.x_0 = gen_relax_problem.solve(display_solver_log,relax_solution)
+        
+        gen_lagrangian = SLR_SubProblem(self.lambdaa, num_of_machines, num_of_jobs, self.cost, self.cap)
+        self.q_l, self.x_l = gen_lagrangian.solve(display_solver_log,relax_solution)
+
+
+b= SLR_Initial("cplex",10,12)        
+"""        
 ####################SOLVING A RELAXED PROBLEM TO GET q_0#######################
-gen_relax_problem = Central_GAP(relaxed_nbM, num_of_jobs, cost, relaxed_cap)
 display_solver_log = False
 relax_solution = False
 q_0, x_0 = gen_relax_problem.solve(display_solver_log,relax_solution)
@@ -171,7 +180,6 @@ q_0, x_0 = gen_relax_problem.solve(display_solver_log,relax_solution)
 gen_lagrangian = SLR_SubProblem(lambdaa, num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False
 relax_solution = False
-Lagrang, x_0 = gen_lagrangian.solve_sp(solver_name, False)
 
 g_m = np.empty([num_of_jobs], dtype=int)
 for j in range(0,num_of_jobs):
@@ -200,5 +208,5 @@ for k in range(1, ItrNum):
     g_m_old = g_m_new
     c_k_old = c_k
     obj = sum(x_sp[m,j]*cost[m,j] for m in range(0,num_of_machines) for j in range(0,num_of_jobs))
-
+"""
        

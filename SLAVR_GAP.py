@@ -156,7 +156,7 @@ lambda_acum["y"].append(lambdaa[1])
 alpha = 0.6
 M = 100
 r = 0.5
-ItrNum = 30
+ItrNum = 300
 #################2#EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False
@@ -187,7 +187,7 @@ sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int)
 sub_counter = 0
 for k in range(1, ItrNum):
     print(lambdaa, c_k_old*g_m )
-    sp = SLR_SubProblem(lambdaa,10.1/ItrNum, num_of_machines, num_of_jobs, cost, cap)
+    sp = SLR_SubProblem(lambdaa,1.1/ItrNum, num_of_machines, num_of_jobs, cost, cap)
     _, x_sp = sp.solve_sp(sub_counter, x_0, False, False)
     if sub_counter <=num_of_machines:
         sub_counter+1

@@ -107,15 +107,16 @@ class SLR_SubProblem():
         self.model.flowbal_2 = Constraint(self.model.nbJ, rule=flow_balance_2)  
         self.model.flowbal_3 = Constraint(self.model.nbJ, rule=flow_balance_3)  
         
-    def solve_sp(self, solve_for_job, x_f, display_solution_stream=False , solve_relaxation = False):
+    def solve_sp(self, solve_for_machine, x_f, display_solution_stream=False , solve_relaxation = False):
         instance = self.model
-        if solve_for_job != -1:
-            for j in range(0, self.nbM):
-                if j != solve_for_job:
-                    for m in range(0, self.nbM):
+        if solve_for_machine != -1:
+            for m in range(0, self.nbM):
+                if m != solve_for_machine:
+                    for j in range(0, self.nbJ):
                        instance.x[m,j] = x_f[m,j]
                        instance.x[m,j].fixed = True
         instance.preprocess()
+        instance.display()
         opt = SolverFactory("cplex" )
         opt.relax = solve_relaxation
         results = opt.solve(instance, tee=display_solution_stream)
@@ -145,7 +146,7 @@ num_of_machines = 10
 num_of_jobs = 12
 relaxed_nbM = num_of_machines
 cost,cap = gen_rand_problem(num_of_machines,num_of_jobs)
-relaxed_cap = cap*3
+relaxed_cap = cap*2
  #Initializing Lambda0
 lambda_acum = {"x": [], "y": []}
 lambdaa = [-10 for i in range(0,num_of_jobs)] 
@@ -155,7 +156,7 @@ lambda_acum["y"].append(lambdaa[1])
 alpha = 0.6
 M = 100
 r = 0.5
-ItrNum = 80
+ItrNum = 30
 #################2#EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False
@@ -186,9 +187,9 @@ sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int)
 sub_counter = 0
 for k in range(1, ItrNum):
     print(lambdaa, c_k_old*g_m )
-    sp = SLR_SubProblem(lambdaa,10/ItrNum, num_of_machines, num_of_jobs, cost, cap)
-    _, x_sp = sp.solve_sp(sub_counter, x_0, solver_name, False)
-    if sub_counter <=num_of_jobs:
+    sp = SLR_SubProblem(lambdaa,10.1/ItrNum, num_of_machines, num_of_jobs, cost, cap)
+    _, x_sp = sp.solve_sp(sub_counter, x_0, False, False)
+    if sub_counter <=num_of_machines:
         sub_counter+1
     else:
        sub_counter = 0 

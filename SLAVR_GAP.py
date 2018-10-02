@@ -36,7 +36,7 @@ class Central_GAP:
         self.model.cost    = self.cost
         self.model.b       = self.b 
         self.model.x       = Var(self.model.nbM*self.model.nbJ, within=Binary)   
-
+        
         def obj_rule(model):
             first_term  = sum(self.model.x[n]*self.model.cost[n] for n in self.model.nbM*self.model.nbJ)          
             return first_term
@@ -71,10 +71,11 @@ class Central_GAP:
 
 class SLR_SubProblem():
     
-    def __init__(self, lambdaa, nbM, nbJ, cost, capacity):
+    def __init__(self, lambdaa, s_k, nbM, nbJ, cost, capacity):
         self.cost, self.b = cost, capacity
         self.nbM = nbM
-        self.nbJ= nbJ
+        self.nbJ = nbJ
+        self.s_k = s_k
         self.Create_Sub_Problem(lambdaa)
           
     def Create_Sub_Problem(self, lambdaa):
@@ -85,18 +86,22 @@ class SLR_SubProblem():
         self.model.cost    = self.cost
         self.model.b       = self.b
         self.model.x       = Var(self.model.nbM*self.model.nbJ, within=Binary)
-  
+        self.model.q      = Var(self.model.nbJ, within=NonNegativeReals)
+
         def obj_rule(model):
             first_term  = sum(self.model.x[n]*(self.model.cost[n]+self.lambdaa[n[1]]) for n in self.model.nbM*self.model.nbJ)
-            second_term = sum(self.lambdaa[j] for j in self.model.nbJ) 
-            return first_term - second_term
-            
+            second_term = sum(self.s_k*self.model.q[j]*0.5 for j in self.model.nbJ) 
+            return first_term - second_term            
         self.model.obj     = Objective(rule=obj_rule,sense=minimize)
             
         def flow_balance_1(model,m):
             return sum(self.model.x[m,j] for j in self.model.nbJ)<= self.model.b[m] 
+        
+        def flow_balance_2(model,j):          
+            return  -self.model.q[j] <= sum(self.model.x[m,j] for m in self.model.nbM)-1 <= self.model.q[j]
                        
         self.model.flowbal_1 = Constraint(self.model.nbM, rule=flow_balance_1)            
+        self.model.flowbal_2 = Constraint(self.model.nbJ, rule=flow_balance_2)    
         
     def solve_sp(self, display_solution_stream=False , solve_relaxation = False):
         instance = self.model
@@ -153,7 +158,8 @@ relax_solution = False
 q_0, x_0 = gen_relax_problem.solve(display_solver_log,relax_solution)
 ####################SOLVING A RELAXED PROBLEM TO GET Lagrangian function#######################  
 #Solving the relaxed problem to get Lagrangian function
-gen_lagrangian = SLR_SubProblem(lambdaa, num_of_machines, num_of_jobs, cost, cap)
+c_k_old = 1
+gen_lagrangian = SLR_SubProblem(c_k_old,lambdaa, num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False
 relax_solution = False
 Lagrang, x_0 = gen_lagrangian.solve_sp(solver_name, False)
@@ -169,7 +175,7 @@ lambdaa = lambdaa + c_k_old*g_m
 sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int) 
 for k in range(1, ItrNum):
     print(lambdaa, c_k_old*g_m )
-    sp = SLR_SubProblem(lambdaa, num_of_machines, num_of_jobs, cost, cap)
+    sp = SLR_SubProblem(c_k_old,lambdaa, num_of_machines, num_of_jobs, cost, cap)
     _, x_sp = sp.solve_sp(solver_name, False)
 
     for j in range(0,num_of_jobs):

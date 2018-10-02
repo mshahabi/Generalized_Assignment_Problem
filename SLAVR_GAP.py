@@ -90,8 +90,8 @@ class SLR_SubProblem():
 
         def obj_rule(model):
             first_term  = sum(self.model.x[n]*(self.model.cost[n]+self.lambdaa[n[1]]) for n in self.model.nbM*self.model.nbJ)
-            second_term = sum(self.s_k*self.model.q[j]*0.5 for j in self.model.nbJ) 
-            return first_term - second_term            
+            second_term = sum(self.model.q[j]*0.5 for j in self.model.nbJ) 
+            return first_term + second_term            
         self.model.obj     = Objective(rule=obj_rule,sense=minimize)
             
         def flow_balance_1(model,m):
@@ -107,8 +107,14 @@ class SLR_SubProblem():
         self.model.flowbal_2 = Constraint(self.model.nbJ, rule=flow_balance_2)  
         self.model.flowbal_3 = Constraint(self.model.nbJ, rule=flow_balance_3)  
         
-    def solve_sp(self, display_solution_stream=False , solve_relaxation = False):
+    def solve_sp(self, solve_for_job, x_f, display_solution_stream=False , solve_relaxation = False):
         instance = self.model
+        if solve_for_job != -1:
+            for j in range(0, self.nbM):
+                if j != solve_for_job:
+                    for m in range(0, self.nbM):
+                       instance.x[m,j] = x_f[m,j]
+                       instance.x[m,j].fixed = True
         instance.preprocess()
         opt = SolverFactory("cplex" )
         opt.relax = solve_relaxation
@@ -163,10 +169,10 @@ q_0, x_0 = gen_relax_problem.solve(display_solver_log,relax_solution)
 ####################SOLVING A RELAXED PROBLEM TO GET Lagrangian function#######################  
 #Solving the relaxed problem to get Lagrangian function
 c_k_old = 0
-gen_lagrangian = SLR_SubProblem(lambdaa,c_k_old, num_of_machines, num_of_jobs, cost, cap)
+gen_lagrangian = SLR_SubProblem(lambdaa,1, num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False
 relax_solution = False
-Lagrang, x_0 = gen_lagrangian.solve_sp(solver_name, False)
+Lagrang, x_0 = gen_lagrangian.solve_sp(-1, x_0, False, False)
 
 g_m = np.empty([num_of_jobs], dtype=int)
 for j in range(0,num_of_jobs):
@@ -177,11 +183,15 @@ if g_m_old ==0:
 c_k_old = (q_0-Lagrang)/g_m_old
 lambdaa = lambdaa + c_k_old*g_m
 sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int) 
+sub_counter = 0
 for k in range(1, ItrNum):
     print(lambdaa, c_k_old*g_m )
-    sp = SLR_SubProblem(lambdaa,c_k_old, num_of_machines, num_of_jobs, cost, cap)
-    _, x_sp = sp.solve_sp(solver_name, False)
-
+    sp = SLR_SubProblem(lambdaa,10/ItrNum, num_of_machines, num_of_jobs, cost, cap)
+    _, x_sp = sp.solve_sp(sub_counter, x_0, solver_name, False)
+    if sub_counter <=num_of_jobs:
+        sub_counter+1
+    else:
+       sub_counter = 0 
     for j in range(0,num_of_jobs):
         g_m[j] =  x_sp[:,j].sum()-1
     g_m_new = sum(g_m**2)    
@@ -195,5 +205,5 @@ for k in range(1, ItrNum):
     g_m_old = g_m_new
     c_k_old = c_k
     obj = sum(x_sp[m,j]*cost[m,j] for m in range(0,num_of_machines) for j in range(0,num_of_jobs))
-
+    x_0 = x_sp
        

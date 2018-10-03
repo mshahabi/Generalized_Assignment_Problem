@@ -6,7 +6,7 @@ Created on Mon Sep 17 13:47:01 2018
 """
 
 """
-Solving a generalized assgnement problem by surrogate lagrangian relaxation
+Solving a generalized assgnement problem by surrogate abselute value lagrangian relaxation
 
 """
 
@@ -90,7 +90,7 @@ class SLR_SubProblem():
 
         def obj_rule(model):
             first_term  = sum(self.model.x[n]*(self.model.cost[n]+self.lambdaa[n[1]]) for n in self.model.nbM*self.model.nbJ)
-            second_term = sum(self.model.q[j]*0.5 for j in self.model.nbJ) 
+            second_term = sum(self.model.q[j]*0.5*self.s_k for j in self.model.nbJ) -  sum(lambdaa[j] for j in self.model.nbJ) 
             return first_term + second_term            
         self.model.obj     = Objective(rule=obj_rule,sense=minimize)
             
@@ -116,7 +116,6 @@ class SLR_SubProblem():
                        instance.x[m,j] = x_f[m,j]
                        instance.x[m,j].fixed = True
         instance.preprocess()
-        instance.display()
         opt = SolverFactory("cplex" )
         opt.relax = solve_relaxation
         results = opt.solve(instance, tee=display_solution_stream)
@@ -125,11 +124,14 @@ class SLR_SubProblem():
         if (results.solver.termination_condition != pyomo.opt.TerminationCondition.optimal):  
             logging.warning('Check solver optimality?')
         instance.solutions.store_to(results)
-        x_s = np.empty([self.nbM,self.nbJ], dtype=int) 
+        x_s = np.empty([self.nbM,self.nbJ], dtype=int)
+        q_s = np.empty([self.nbJ], dtype=float) 
         for p in instance.nbM:
             for q in instance.nbJ:
                     x_s[p,q] = instance.x[p,q].value
-        return value(instance.obj), x_s 
+        for j in instance.nbJ:
+                    q_s[j] = instance.q[j].value            
+        return value(instance.obj), x_s, q_s 
     
 #########################Function to generate a random problem#################
 def gen_rand_problem(nbM,nbJ):
@@ -156,8 +158,8 @@ lambda_acum["y"].append(lambdaa[1])
 alpha = 0.6
 M = 100
 r = 0.5
-ItrNum = 300
-#################2#EXACT RESULTS###############################################
+ItrNum =3
+#####################EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False
 relax_solution = False
@@ -170,10 +172,13 @@ q_0, x_0 = gen_relax_problem.solve(display_solver_log,relax_solution)
 ####################SOLVING A RELAXED PROBLEM TO GET Lagrangian function#######################  
 #Solving the relaxed problem to get Lagrangian function
 c_k_old = 0
+s_k = 20
+counter_ = 1
 gen_lagrangian = SLR_SubProblem(lambdaa,1, num_of_machines, num_of_jobs, cost, cap)
 display_solver_log = False
 relax_solution = False
-Lagrang, x_0 = gen_lagrangian.solve_sp(-1, x_0, False, False)
+Lagrang, x_0, q_ = gen_lagrangian.solve_sp(-1, x_0, False, False)
+obj_lagrang = sum(x_0[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs))+ sum(q_[j]*0.5*s_k for j in range(0,num_of_jobs))
 
 g_m = np.empty([num_of_jobs], dtype=int)
 for j in range(0,num_of_jobs):
@@ -185,14 +190,19 @@ c_k_old = (q_0-Lagrang)/g_m_old
 lambdaa = lambdaa + c_k_old*g_m
 sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int) 
 sub_counter = 0
+flag = 1
 for k in range(1, ItrNum):
     print(lambdaa, c_k_old*g_m )
-    sp = SLR_SubProblem(lambdaa,1.1/ItrNum, num_of_machines, num_of_jobs, cost, cap)
-    _, x_sp = sp.solve_sp(sub_counter, x_0, False, False)
-    if sub_counter <=num_of_machines:
-        sub_counter+1
-    else:
-       sub_counter = 0 
+    flag = 1
+    sub_counter = 0     
+    while obj_lagrang>=Lagrang and flag == 1:
+        sp = SLR_SubProblem(lambdaa, 0.1, num_of_machines, num_of_jobs, cost, cap)
+        _, x_sp = sp.solve_sp(sub_counter, x_0, False, False)
+        obj_lagrang = sum(x_sp[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs))
+        if sub_counter <=num_of_machines:
+            sub_counter+1
+        else:
+           flag = 0 
     for j in range(0,num_of_jobs):
         g_m[j] =  x_sp[:,j].sum()-1
     g_m_new = sum(g_m**2)    
@@ -206,5 +216,7 @@ for k in range(1, ItrNum):
     g_m_old = g_m_new
     c_k_old = c_k
     obj = sum(x_sp[m,j]*cost[m,j] for m in range(0,num_of_machines) for j in range(0,num_of_jobs))
+    Lagrang = sum(x_sp[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs))
+
     x_0 = x_sp
        

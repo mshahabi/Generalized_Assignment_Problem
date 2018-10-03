@@ -144,6 +144,8 @@ def gen_rand_problem(nbM,nbJ):
      return cost_, cap    
 ################### SET THE SOLVER#############################################
 solver_name =  "cplex"
+display_solver_log = False
+relax_solution = False
 num_of_machines = 10
 num_of_jobs = 12
 relaxed_nbM = num_of_machines
@@ -158,28 +160,27 @@ lambda_acum["y"].append(lambdaa[1])
 alpha = 0.6
 M = 100
 r = 0.5
-ItrNum =3
+ItrNum = 10
 #####################EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
-display_solver_log = False
-relax_solution = False
+
 q_e, x_e = gen_exact_problem.solve(display_solver_log,relax_solution)  
+
 ####################SOLVING A RELAXED PROBLEM TO GET q_0#######################
+
 gen_relax_problem = Central_GAP(relaxed_nbM, num_of_jobs, cost, relaxed_cap)
-display_solver_log = False
-relax_solution = False
+
 q_0, x_0 = gen_relax_problem.solve(display_solver_log,relax_solution)
 ####################SOLVING A RELAXED PROBLEM TO GET Lagrangian function#######################  
 #Solving the relaxed problem to get Lagrangian function
 c_k_old = 0
 s_k = 20
 counter_ = 1
-gen_lagrangian = SLR_SubProblem(lambdaa,1, num_of_machines, num_of_jobs, cost, cap)
-display_solver_log = False
-relax_solution = False
+gen_lagrangian = SLR_SubProblem(lambdaa,s_k, num_of_machines, num_of_jobs, cost, cap)
 Lagrang, x_0, q_ = gen_lagrangian.solve_sp(-1, x_0, False, False)
-obj_lagrang = sum(x_0[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs))+ sum(q_[j]*0.5*s_k for j in range(0,num_of_jobs))
 
+Lagrang_k = sum(x_0[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs)) + sum(q_[j]*0.5*s_k for j in range(0,num_of_jobs))
+Lagrang_sp = Lagrang_k + 0.001 
 g_m = np.empty([num_of_jobs], dtype=int)
 for j in range(0,num_of_jobs):
     g_m[j] =  x_0[:,j].sum()-1
@@ -195,10 +196,11 @@ for k in range(1, ItrNum):
     print(lambdaa, c_k_old*g_m )
     flag = 1
     sub_counter = 0     
-    while obj_lagrang>=Lagrang and flag == 1:
-        sp = SLR_SubProblem(lambdaa, 0.1, num_of_machines, num_of_jobs, cost, cap)
-        _, x_sp = sp.solve_sp(sub_counter, x_0, False, False)
-        obj_lagrang = sum(x_sp[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs))
+    while Lagrang_sp>Lagrang_k and flag == 1:
+        print("While is entered")
+        sp = SLR_SubProblem(lambdaa, s_k, num_of_machines, num_of_jobs, cost, cap)
+        Lagrang_sp, x_sp, q_sp = sp.solve_sp(sub_counter, x_0, False, False)
+        Lagrang_k = sum(x_0[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs)) + sum(q_[j]*0.5*s_k for j in range(0,num_of_jobs))
         if sub_counter <=num_of_machines:
             sub_counter+1
         else:
@@ -216,7 +218,5 @@ for k in range(1, ItrNum):
     g_m_old = g_m_new
     c_k_old = c_k
     obj = sum(x_sp[m,j]*cost[m,j] for m in range(0,num_of_machines) for j in range(0,num_of_jobs))
-    Lagrang = sum(x_sp[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs))
-
     x_0 = x_sp
-       
+    q_  = q_sp  

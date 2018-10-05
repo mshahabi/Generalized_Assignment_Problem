@@ -162,7 +162,7 @@ lambda_acum["y"].append(lambdaa[1])
 alpha = 0.06
 M = 10
 r = 0.5
-ItrNum = 100
+ItrNum = 28
 
 #####################EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
@@ -248,14 +248,19 @@ for k in range(1, ItrNum):
         obj = sum(x_sp[m,j]*cost[m,j] for m in range(0,num_of_machines) for j in range(0,num_of_jobs))
         x_0 = x_sp
         q_  = q_sp
+        s_k = s_k*1.1
         print("**************************************")   
         print("**************************************")
         print("Error Rate", sum(sum((x_e-x_sp)**2)))
-        print("GAP Rate", (q_e-Lagrang_sp)/Lagrang_sp)   
+        print("GAP Rate", (obj-q_e)/obj)   
         print("**************************************")
         print("**************************************")
         if (q_e-Lagrang_sp)/Lagrang_sp==0.00: break
     else:
-        break
+        obj = sum(x_sp[m,j]*cost[m,j] for m in range(0,num_of_machines) for j in range(0,num_of_jobs))
+        x_0 = x_sp
+        q_  = q_sp
+        s_k = s_k/1.1
+
 print("Exact Obj","Relaxed","Lagrang_sp","Lagrang_k")    
 print(q_e, ",,,," , obj, ",,," ,   Lagrang_sp, "," , Lagrang_k)    

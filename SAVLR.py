@@ -10,35 +10,38 @@ from config_opt import config
 
 
 
-class initialization:
+class Initial_SAVLR:
     
-    def __init__(self):
+    def __init__(self, config):
+        
         self.relaxed_nbM = config["num_of_machines"]
         if config["genrate_new_problem"]==True:
             self.cost, self.cap = SLR_SubProblem.gen_rand_problem(config["num_of_machines"],config["num_of_jobs"])
         self.relaxed_cap = self.cap*2    
         self.lambdaa = [-100 for i in range(0, config["num_of_jobs"])] 
-    
-#######################EXACT RESULTS###############################################
+        self.c_k_old = 0
+        self.s_k = 65
+        
+    def solve_problems(self):
+        ################EXACT RESULTS###############################################
         gen_exact_problem = Central_GAP(config["num_of_machines"], config["num_of_jobs"], self.cost, self.cap)
         self.q_e, self.x_e = gen_exact_problem.solve(config["display_solver_log"],config["relax_solution"])  
 
-####################SOLVING A RELAXED PROBLEM TO GET q_0###########################
+        ############SOLVING A RELAXED PROBLEM TO GET q_0###########################
         gen_relax_problem = Central_GAP(self.relaxed_nbM, config["num_of_jobs"], self.cost, self.relaxed_cap)
         self.q_0, x_0 = gen_relax_problem.solve(config["display_solver_log"],config["relax_solution"])
 
-####################SOLVING A RELAXED PROBLEM TO GET Lagrangian function#######################  
-#Solving the relaxed problem to get Lagrangian function
-        c_k_old = 0
-        s_k = 65
+        ####################SOLVING A RELAXED PROBLEM TO GET Lagrangian function#######################  
+        #Solving the relaxed problem to get Lagrangian function
         gen_lagrangian = SLR_SubProblem(self.lambdaa,self.s_k, config["num_of_machines"], config["num_of_jobs"], self.cost, self.cap)
         self.Lagrang, self.x_0, self.q_ = gen_lagrangian.solve_sp(-1, x_0, False, False)
 
-        Lagrang_k = sum(x_0[m,j]*(self.cost[m,j] + self.lambdaa[j]) for m in range(0, config["num_of_machines"]) for j in range(0, config["num_of_jobs"]))-sum(self.lambdaa[j] for j in range(0,config["num_of_jobs"])) + sum(q_[j]*0.5*s_k for j in range(0, config["num_of_jobs"]))
+        Lagrang_k = sum(x_0[m,j]*(self.cost[m,j] + self.lambdaa[j]) for m in range(0, config["num_of_machines"]) for j in range(0, config["num_of_jobs"]))-sum(self.lambdaa[j] for j in range(0,config["num_of_jobs"])) + sum(self.q_[j]*0.5*self.s_k for j in range(0, config["num_of_jobs"]))
         Lagrang_sp = Lagrang_k 
-        
     
-    def initialize_SAVLR(self):
+    def initialize(self):
+        
+        self.solve_problems()
         self.g_m = np.empty([config["num_of_jobs"]], dtype=int)
         for j in range(0, config["num_of_jobs"]):
             self.g_m[j] =  self.x_0[:,j].sum()-1
@@ -47,12 +50,14 @@ class initialization:
         if self.g_m_old !=0:   
            self.c_k_old = (self.q_0-self.Lagrang)/self.g_m_old
            self.lambdaa = self.lambdaa + self.c_k_old*self.g_m
-        else:
+        if self.g_m_old ==0 and self.c_k_old==0:
             print("Optimality is acheived no need to continue")
-            ItrNum = 1
             self.obj = sum(self.x_0[m,j]*self.cost[m,j] for m in range(0, config["num_of_machines"]) for j in range(0, config["num_of_jobs"]))
 
-sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int) 
+start_=Initial_SAVLR(config)
+start_.initialize()
+"""
+sub_sol = np.empty([config["num_of_machines"], config["num_of_jobs"]], dtype=int) 
 sub_counter = 0
 
 for k in range(1, ItrNum):
@@ -118,4 +123,4 @@ for k in range(1, ItrNum):
         s_k = s_k/1.1
 
 print("Exact Obj","Relaxed","Lagrang_sp","Lagrang_k")    
-print(q_e, ",,,," , obj, ",,," ,   Lagrang_sp, "," , Lagrang_k)    
+print(q_e, ",,,," , obj, ",,," ,   Lagrang_sp, "," , Lagrang_k)    """

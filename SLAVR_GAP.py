@@ -160,7 +160,7 @@ lambda_acum["y"].append(lambdaa[1])
 alpha = 0.6
 M = 10
 r = 0.5
-ItrNum = 2
+ItrNum = 20
 
 #####################EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
@@ -245,4 +245,5 @@ for k in range(1, ItrNum):
     print("GAP Rate", (q_e-obj)/obj)   
     print("**************************************")
     print("**************************************")
-print(q_e,obj,Lagrang_sp,Lagrang_k)    
+print("Exact Obj","Relaxed","Lagrang_sp","Lagrang_k")    
+print(q_e, ",,,," , obj, ",,," ,   Lagrang_sp, "," , Lagrang_k)    

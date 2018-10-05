@@ -170,8 +170,8 @@ sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int)
 for k in range(1, ItrNum):
     print(lambdaa, c_k_old*g_m )
     sp = SLR_SubProblem(lambdaa, num_of_machines, num_of_jobs, cost, cap)
-    _, x_sp = sp.solve_sp(solver_name, False)
-
+    q_sp, x_sp = sp.solve_sp(False, False)
+    print(q_sp)
     for j in range(0,num_of_jobs):
         g_m[j] =  x_sp[:,j].sum()-1
     g_m_new = sum(g_m**2)    

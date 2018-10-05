@@ -158,9 +158,10 @@ lambda_acum["x"].append(lambdaa[0])
 lambda_acum["y"].append(lambdaa[1])
 #SLR initial paramters
 alpha = 0.6
-M = 100
+M = 10
 r = 0.5
-ItrNum = 10
+ItrNum = 2
+
 #####################EXACT RESULTS###############################################
 gen_exact_problem = Central_GAP(num_of_machines, num_of_jobs, cost, cap)
 
@@ -180,7 +181,7 @@ gen_lagrangian = SLR_SubProblem(lambdaa,s_k, num_of_machines, num_of_jobs, cost,
 Lagrang, x_0, q_ = gen_lagrangian.solve_sp(-1, x_0, False, False)
 
 Lagrang_k = sum(x_0[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs)) + sum(q_[j]*0.5*s_k for j in range(0,num_of_jobs))
-Lagrang_sp = Lagrang_k + 0.001 
+Lagrang_sp = Lagrang_k 
 g_m = np.empty([num_of_jobs], dtype=int)
 for j in range(0,num_of_jobs):
     g_m[j] =  x_0[:,j].sum()-1
@@ -191,20 +192,35 @@ c_k_old = (q_0-Lagrang)/g_m_old
 lambdaa = lambdaa + c_k_old*g_m
 sub_sol = np.empty([num_of_machines, num_of_jobs], dtype=int) 
 sub_counter = 0
-flag = 1
+
 for k in range(1, ItrNum):
-    print(lambdaa, c_k_old*g_m )
-    flag = 1
-    sub_counter = 0     
-    while Lagrang_sp>Lagrang_k and flag == 1:
-        print("While is entered")
-        sp = SLR_SubProblem(lambdaa, s_k, num_of_machines, num_of_jobs, cost, cap)
-        Lagrang_sp, x_sp, q_sp = sp.solve_sp(sub_counter, x_0, False, False)
-        Lagrang_k = sum(x_0[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs)) + sum(q_[j]*0.5*s_k for j in range(0,num_of_jobs))
-        if sub_counter <=num_of_machines:
-            sub_counter+1
-        else:
-           flag = 0 
+    sub_counter = 0
+    flag = 0
+    main_counter = 0 
+    print("Solving the first sub problem")
+    sp = SLR_SubProblem(lambdaa, s_k, num_of_machines, num_of_jobs, cost, cap)
+    Lagrang_sp, x_sp, q_sp = sp.solve_sp(sub_counter, x_0, False, False)
+    Lagrang_k = sum(x_0[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs)) + sum(q_[j]*0.5*s_k for j in range(0,num_of_jobs))
+    print(Lagrang_sp,Lagrang_k )
+    if Lagrang_sp>=Lagrang_k :
+        while flag==0:
+            print("Start Solving the Second Sub Problem")
+            sp = SLR_SubProblem(lambdaa, s_k, num_of_machines, num_of_jobs, cost, cap)
+            Lagrang_sp, x_sp, q_sp = sp.solve_sp(sub_counter, x_0, False, False)
+            Lagrang_k = sum(x_0[m,j]*(cost[m,j] + lambdaa[j]) for m in range(0,num_of_machines) for j in range(0,num_of_jobs))-sum(lambdaa[j] for j in range(0,num_of_jobs)) + sum(q_[j]*0.5*s_k for j in range(0,num_of_jobs))
+            sub_counter = sub_counter + 1
+            main_counter = main_counter +1
+            if sub_counter>=num_of_machines:
+                sub_counter = 0
+                s_k = s_k/2
+            if Lagrang_sp<Lagrang_k:
+                print("Lagrangian Optimality conditioned is achevied")
+                flag = 1
+                print(Lagrang_sp,Lagrang_k )
+            if main_counter>20:
+                print("Lagrangian Optimality conditioned is not found: Returning the previous solution")
+                x_sp = x_0 
+                flag = 1                
     for j in range(0,num_of_jobs):
         g_m[j] =  x_sp[:,j].sum()-1
     g_m_new = sum(g_m**2)    
@@ -213,10 +229,20 @@ for k in range(1, ItrNum):
     p = 1 - 1/(k**r)
     alpha = 1- 1/(M*k**p)
     c_k = alpha*c_k_old*g_m_old/g_m_new
+    print("Lambdaa",lambdaa)
+    print("Change in Lambda",c_k*g_m)
     lambdaa = lambdaa + c_k*g_m
-
+    print("New Lambda", lambdaa)
     g_m_old = g_m_new
     c_k_old = c_k
     obj = sum(x_sp[m,j]*cost[m,j] for m in range(0,num_of_machines) for j in range(0,num_of_jobs))
     x_0 = x_sp
-    q_  = q_sp  
+    q_  = q_sp
+    s_k = s_k/2
+    print("**************************************")   
+    print("**************************************")
+    print("Error Rate", sum(sum((x_e-x_sp)**2)))
+    print("GAP Rate", (q_e-obj)/obj)   
+    print("**************************************")
+    print("**************************************")
+print(q_e,obj,Lagrang_sp,Lagrang_k)    

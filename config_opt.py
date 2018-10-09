@@ -12,6 +12,6 @@ config["relax_solution"] = False
 config["alpha"] = 0.06
 config["M"] = 10
 config["r"] = 0.5
-config["ItrNum"] = 28
+config["ItrNum"] = 40
 config["num_of_machines"] = 10
 config["num_of_jobs"] = 12

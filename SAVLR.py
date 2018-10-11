@@ -19,7 +19,7 @@ class Initial_SAVLR:
         self.relaxed_cap = self.cap*2    
         self.lambdaa = [-101 for i in range(0, config["num_of_jobs"])] 
         self.c_k_old = 0
-        self.s_k = 10
+        self.s_k = 1/1000
         
     def solve_problems(self):
         ################EXACT RESULTS###############################################
@@ -67,9 +67,11 @@ class SAVLR(Initial_SAVLR):
         print("***********STARTING SAVLR ALGORITHM*************")
         lagrangian_optimality = 0
         for k in range(1, config["ItrNum"]):
+            
             print("**************************************")   
             print("Iteration %s has been started"%k, "S_k is equal to %s"%self.s_k)
             print("**************************************")
+            
             sub_counter = 0
             flag = 0
             main_counter = 0
@@ -81,17 +83,20 @@ class SAVLR(Initial_SAVLR):
             if int(round(self.Lagrang_sp))>=int(round(Lagrang_k)): 
                 print(True, self.Lagrang_sp- Lagrang_k) 
             else: print(False,self.Lagrang_sp - Lagrang_k )
+            sub_counter = sub_counter + 1
+            
             if int(round(self.Lagrang_sp))>=int(round(Lagrang_k)):                
                 while flag==0:
                     print("Start Solving the Second Sub Problem")
                     sp = SLR_SubProblem(self.lambdaa, self.s_k, config["num_of_machines"], config["num_of_jobs"], self.cost, self.cap)
                     self.Lagrang_sp, self.x_sp, self.q_sp = sp.solve_sp(sub_counter, self.x_0, False, False)
                     Lagrang_k = sum(self.x_0[m,j]*(self.cost[m,j] + self.lambdaa[j]) for m in range(0,config["num_of_machines"]) for j in range(0, config["num_of_jobs"]))-sum(self.lambdaa[j] for j in range(0,config["num_of_jobs"])) + sum(self.q_[j]*0.5*self.s_k for j in range(0, config["num_of_jobs"]))
+                    print(sub_counter, self.Lagrang_sp,self.x_sp,self.x_0)
                     sub_counter = sub_counter + 1
                     main_counter = main_counter +1
                     if sub_counter==config["num_of_machines"]-1:
                         sub_counter = 0
-                        self.s_k = self.s_k/1.2
+                        self.s_k = self.s_k/1.02
                         lagrangian_optimality = 1
                     if int(self.Lagrang_sp)<int(Lagrang_k):
                         print("Lagrangian Optimality conditioned is achevied")
@@ -103,7 +108,6 @@ class SAVLR(Initial_SAVLR):
                         self.q_sp = self.q_
                         flag = 1   
 
-                        
             for j in range(0, config["num_of_jobs"]):
                 self.g_m[j] =  self.x_sp[:,j].sum()-1
             self.g_m_new = sum(self.g_m**2)    
@@ -123,6 +127,8 @@ class SAVLR(Initial_SAVLR):
                 self.q_  = self.q_sp
                 if  lagrangian_optimality == 0:
                     self.s_k = self.s_k*1.02
+                else:
+                    self.s_k = self.s_k/1.02
                 print("**************************************")   
                 print("**************************************")
                 print("Error Rate", sum(sum((self.x_e-self.x_sp)**2)))
@@ -134,6 +140,11 @@ class SAVLR(Initial_SAVLR):
                 self.obj = sum(self.x_sp[m,j]*self.cost[m,j] for m in range(0, config["num_of_machines"]) for j in range(0, config["num_of_jobs"]))
                 self.x_0 = self.x_sp
                 self.q_  = self.q_sp
+                if  lagrangian_optimality == 0:
+                    self.s_k = self.s_k*2.2
+                else:
+                    self.s_k = self.s_k/2.2
+
             print("Exact Obj","Relaxed","Lagrang_sp","Lagrang_k")    
             print(self.q_e, ",,,," , self.obj, ",,," ,   self.Lagrang_sp, "," , Lagrang_k)     
         return self.x_e, self.x_0

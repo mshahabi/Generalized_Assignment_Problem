@@ -136,7 +136,7 @@ class SLR_SubProblem():
         cost_ = np.empty([nbM,nbJ], dtype=float)
         cap = np.empty([nbM], dtype=float)
         for M in range(0, nbM):
-            cap[M] = 2
+            cap[M] = 3
             for J in range(0, nbJ):
                  cost_[M,J] = random.randint(0,100)       
         return cost_, cap    

@@ -19,6 +19,7 @@ import math
 import logging
 import numpy as np
 import cplex
+import random
 
 class Central_GAP:
     
@@ -84,8 +85,8 @@ class SLR_SubProblem():
         self.model.nbJ     = Set(initialize=range(0,self.nbJ))
         self.model.cost    = self.cost
         self.model.b       = self.b
-        self.model.x       = Var(self.model.nbM*self.model.nbJ, within=Binary)
-        self.model.q      = Var(self.model.nbJ, within=NonNegativeReals)
+        self.model.x       = Var(self.model.nbM*self.model.nbJ, within=Binary, initialize=0)
+        self.model.q       = Var(self.model.nbJ, within=NonNegativeReals, initialize=0.0)
 
         def obj_rule(model):
             first_term  = sum(self.model.x[n]*(self.model.cost[n]+self.lambdaa[n[1]]) for n in self.model.nbM*self.model.nbJ)
@@ -106,11 +107,11 @@ class SLR_SubProblem():
         self.model.flowbal_2 = Constraint(self.model.nbJ, rule=flow_balance_2)  
         self.model.flowbal_3 = Constraint(self.model.nbJ, rule=flow_balance_3)  
         
-    def solve_sp(self, solve_for_machine, x_f, display_solution_stream=False , solve_relaxation = False):
+    def solve_sp(self, solve_for_machine, x_f, display_solution_stream=True , solve_relaxation = False):
         instance = self.model
         if solve_for_machine != -1:
             for m in range(0, self.nbM):
-                if m != solve_for_machine:
+                if m not in solve_for_machine:
                     for j in range(0, self.nbJ):
                        instance.x[m,j] = x_f[m,j]
                        instance.x[m,j].fixed = True
@@ -136,8 +137,9 @@ class SLR_SubProblem():
         cost_ = np.empty([nbM,nbJ], dtype=float)
         cap = np.empty([nbM], dtype=float)
         for M in range(0, nbM):
-            cap[M] = 3
+            cap[M] = random.randint(1,3*int(nbJ/nbM))
+            print(cap[M])
             for J in range(0, nbJ):
-                 cost_[M,J] = random.randint(0,100)       
+                 cost_[M,J] = random.randint(0,20)       
         return cost_, cap    
 
